@@ -1,0 +1,143 @@
+'''
+Filename: HW08-Chengyao Zheng.py
+Created Date: Tuesday, April 2nd 2019, 11:06:38 am
+Author: Chengyao Zheng
+
+Copyright (c) 2019 Chengyao Zheng
+'''
+
+from collections import defaultdict
+from prettytable import PrettyTable
+import os
+
+class Repository:
+    # stores and process grade files
+    # but only store students and instructors
+    def __init__(self, path):
+        self.path = path
+        self.pStu = os.path.join(path, 'students.txt')
+        self.pIns = os.path.join(path, 'instructors.txt')
+        self.pGPA = os.path.join(path, 'grades.txt')
+        self.stu = dict()
+        self.ins = dict()
+
+    def file_reader(self,path,fields,sep = '\t',header = False):
+        try:
+            fp = open(path,'r')
+
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Can't find or open {path}, please try another folder path")
+
+        else:
+            with fp:
+                for n, line in enumerate(fp):
+                    count = n + 1
+                    fds = line.strip().split(sep)
+
+                    if n == 0 and header:
+                        continue
+
+                    elif len(fds) == fields:
+                        yield fds
+
+                    else:
+                        raise ValueError(f" {path} has {len(fds)} fields on line {count} but except {fields}")
+    
+    def rStu(self):
+        for CWID, Name, Dept in self.file_reader(self.pStu, 3):
+            self.stu[CWID] = Student(CWID, Name, Dept)
+
+    def rIns(self):
+        for CWID, Name, Dept in self.file_reader(self.pIns, 3):
+            self.ins[CWID] = Instructor(CWID, Name, Dept)
+
+    def rGPA(self):
+        for CWID, course, grade, insID in self.file_reader(self.pGPA, 4):
+            if CWID in self.stu.keys() and grade != '':
+                self.stu[CWID].cgrade(course, grade)
+
+            if insID in self.ins.keys():
+                self.ins[insID].cPop(course)
+
+    def SS(self):
+        '''Student Summary'''
+
+        table = PrettyTable(field_names=['CWID','Name','Completed Courses'])
+        table.title = 'Student Summary'
+
+        for stu in self.stu.values():
+            for CWID, Name, course in stu.pt():
+                table.add_row([CWID, Name, course])
+
+        print(table)
+        
+    def IS(self):
+        '''Instructor Summary'''
+
+        table = PrettyTable(field_names=['CWID','Name','Dept','Course','Students'])
+        table.title = 'Instructor Summary'
+
+        for ins in self.ins.values():
+            for CWID, Name, Dept, course, students in ins.pt():
+                table.add_row([CWID, Name, Dept, course, students])
+
+        print(table)
+
+
+class Student:
+    # student grades stored with each person individually
+    def __init__(self, CWID, Name, Dept):
+        self.CWID = CWID
+        self.Name = Name
+        self.Dept = Dept
+        self.grade = defaultdict(lambda: 'not taken/finished')
+
+    def cgrade(self, course, grade):
+        self.grade[course] = grade
+
+    def pt(self):
+        yield self.CWID, self.Name, sorted(list(self.grade.keys()))
+
+
+class Instructor:
+    # instructor courses: must be sorted
+    def __init__(self, CWID, Name, Dept):
+        self.CWID = CWID
+        self.Name = Name
+        self.Dept = Dept
+        self.course_Pop = defaultdict(int)
+
+    def cPop(self, course):
+        self.course_Pop[course] += 1
+        
+    def pt(self):
+        for course, students in self.course_Pop.items():
+            yield self.CWID, self.Name, self.Dept, course, students
+
+def main(path):
+    try:
+        rp = Repository(path)
+        rp.rStu()
+        rp.rIns()
+        rp.rGPA()
+        rp.SS()
+        rp.IS()
+    except FileNotFoundError as e:
+        print(e)
+    except ValueError as f:
+        print(f)
+
+if __name__ == "__main__":
+    while True:
+        path = input('Please input a folder path:\n')
+        main(path)   # interact with the user
+        
+        #Old story: continue or not?
+        option = input("Contine? input anything to continue, or enter Q to quit: ")
+        
+        if option == "Q" or option == "q":
+            print("Have a nice day! Good-Bye!")
+            quit()
+        
+        else:
+            pass
