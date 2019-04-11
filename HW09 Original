@@ -1,5 +1,5 @@
 '''
-Filename: HW08-Chengyao Zheng.py
+Filename: HW10-Chengyao Zheng.py
 Created Date: Tuesday, April 2nd 2019, 11:06:38 am
 Author: Chengyao Zheng
 
@@ -8,18 +8,24 @@ Copyright (c) 2019 Chengyao Zheng
 
 from collections import defaultdict
 from prettytable import PrettyTable
+import unittest
 import os
 
 class Repository:
-    # stores and process grade files
-    # but only store students and instructors
+    # stores and process students, instructors and major informations
     def __init__(self, path):
         self.path = path
         self.pStu = os.path.join(path, 'students.txt')
         self.pIns = os.path.join(path, 'instructors.txt')
         self.pGPA = os.path.join(path, 'grades.txt')
+        self.pMajor = os.path.join(path, 'majors.txt')
         self.stu = dict()
         self.ins = dict()
+        self.major = dict()
+        self.read_Student()
+        self.read_Instructor()
+        self.read_Grade()
+        self.read_Major()
 
     def file_reader(self,path,fields,sep = '\t',header = False):
         try:
@@ -43,45 +49,73 @@ class Repository:
                     else:
                         raise ValueError(f" {path} has {len(fds)} fields on line {count} but except {fields}")
     
-    def rStu(self):
+    def read_Student(self):
         for CWID, Name, Dept in self.file_reader(self.pStu, 3):
             self.stu[CWID] = Student(CWID, Name, Dept)
 
-    def rIns(self):
+    def read_Instructor(self):
         for CWID, Name, Dept in self.file_reader(self.pIns, 3):
             self.ins[CWID] = Instructor(CWID, Name, Dept)
 
-    def rGPA(self):
+    def read_Grade(self):
         for CWID, course, grade, insID in self.file_reader(self.pGPA, 4):
             if CWID in self.stu.keys() and grade != '':
                 self.stu[CWID].cgrade(course, grade)
 
             if insID in self.ins.keys():
                 self.ins[insID].cPop(course)
+    
+    def read_Major(self):
+        for Dept, flag, course in self.file_reader(self.pMajor, 3):
+            if Dept not in self.major:
+                self.major[Dept] = Major(Dept)
+            self.major[Dept].add_course(flag, course)
 
-    def SS(self):
+    def Major_Summary(self):
+        '''Major Summary'''
+        test = dict()
+        # dictionary for testing purpose
+        table = PrettyTable(field_names=['Dept','Required','Electives'])
+        table.title = 'Major Summary'
+
+        for majors in self.major.values():
+            for Dept, Required, Electives in majors.pt():
+                table.add_row([Dept, Required, Electives])
+                test[Dept] = [Dept, sorted(Required), sorted(Electives)]
+
+        print(table)
+        return test
+        
+
+    def Student_Summary(self):
         '''Student Summary'''
-
-        table = PrettyTable(field_names=['CWID','Name','Completed Courses'])
+        test = dict()
+        # dictionary for testing purpose
+        table = PrettyTable(field_names=['CWID','Name','Completed Courses', 'Remaining Required', 'Remaining Electives'])
         table.title = 'Student Summary'
 
         for stu in self.stu.values():
-            for CWID, Name, course in stu.pt():
-                table.add_row([CWID, Name, course])
+            for CWID, Name, course, Required_remaining, Electives_remaining in stu.pt(self.major[stu.Dept]):
+                table.add_row([CWID, Name, course, Required_remaining, Electives_remaining])
+                test[CWID] = [CWID, Name, sorted(course), Required_remaining, Electives_remaining]
 
         print(table)
+        return test
         
-    def IS(self):
+    def Instructor_Summary(self):
         '''Instructor Summary'''
-
+        test = set()
+        # set for testing purpose due to possible repeated keys.
         table = PrettyTable(field_names=['CWID','Name','Dept','Course','Students'])
         table.title = 'Instructor Summary'
 
         for ins in self.ins.values():
             for CWID, Name, Dept, course, students in ins.pt():
                 table.add_row([CWID, Name, Dept, course, students])
+                test.add((CWID, Name, Dept, course, students))
 
         print(table)
+        return test
 
 
 class Student:
@@ -95,12 +129,14 @@ class Student:
     def cgrade(self, course, grade):
         self.grade[course] = grade
 
-    def pt(self):
-        yield self.CWID, self.Name, sorted(list(self.grade.keys()))
+    def pt(self, major):
+        passed = {courses for courses, grade in self.grade.items() if grade in ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-']}
+        remaining_req, remaining_ele = major.Remaining(passed)
+        yield self.CWID, self.Name, sorted(list(passed)), remaining_req, remaining_ele
 
 
 class Instructor:
-    # instructor courses: must be sorted
+    # instructor information
     def __init__(self, CWID, Name, Dept):
         self.CWID = CWID
         self.Name = Name
@@ -114,21 +150,88 @@ class Instructor:
         for course, students in self.course_Pop.items():
             yield self.CWID, self.Name, self.Dept, course, students
 
+
+class Major:
+    # major information: required and elective courses
+    def __init__(self, Dept):
+        self.Dept = Dept
+        self.Required = set()
+        self.Electives = set()
+
+    def add_course(self, flag, course):
+        if flag == 'R':
+            self.Required.add(course)
+
+        if flag == 'E':
+            self.Electives.add(course)
+
+    def pt(self):
+        yield self.Dept, list(self.Required), list(self.Electives)
+
+    def Remaining(self, course_set):
+        remaining_req = self.Required - course_set
+        if self.Electives & course_set:
+            remaining_ele = None
+        else:
+            remaining_ele = self.Electives
+
+        return remaining_req, remaining_ele
+
+
 def main(path):
     try:
-        rp = Repository(path)
-        rp.rStu()
-        rp.rIns()
-        rp.rGPA()
-        rp.SS()
-        rp.IS()
+        repo = Repository(path)
+        repo.Major_Summary()
+        repo.Student_Summary()
+        repo.Instructor_Summary()
+        
     except FileNotFoundError as e:
         print(e)
+
     except ValueError as f:
         print(f)
 
+
+class TestRepository(unittest.TestCase):
+    def test_repository(self):
+        Repo = Repository('D:\\SSW810')
+        Expect_Major_Summary = {'SFEN': ['SFEN', ['SSW 540', 'SSW 555', 'SSW 564', 'SSW 567'], ['CS 501', 'CS 513', 'CS 545']], 
+        'SYEN': ['SYEN', ['SYS 612', 'SYS 671', 'SYS 800'], ['SSW 540', 'SSW 565', 'SSW 810']]}
+
+        Expect_Student_Summary = {'10103': ['10103', 'Baldwin, C', ['CS 501', 'SSW 564', 'SSW 567', 'SSW 687'], {'SSW 555', 'SSW 540'}, None], 
+        '10115': ['10115', 'Wyatt, X', ['CS 545', 'SSW 564', 'SSW 567', 'SSW 687'], {'SSW 555', 'SSW 540'}, None], 
+        '10172': ['10172', 'Forbes, I', ['SSW 555', 'SSW 567'], {'SSW 540', 'SSW 564'}, {'CS 513', 'CS 501', 'CS 545'}], 
+        '10175': ['10175', 'Erickson, D', ['SSW 564', 'SSW 567', 'SSW 687'], {'SSW 555', 'SSW 540'}, {'CS 513', 'CS 501', 'CS 545'}], 
+        '10183': ['10183', 'Chapman, O', ['SSW 689'], {'SSW 567', 'SSW 555', 'SSW 540', 'SSW 564'}, {'CS 513', 'CS 501', 'CS 545'}], 
+        '11399': ['11399', 'Cordova, I', ['SSW 540'], {'SYS 671', 'SYS 612', 'SYS 800'}, None], 
+        '11461': ['11461', 'Wright, U', ['SYS 611', 'SYS 750', 'SYS 800'], {'SYS 671', 'SYS 612'}, {'SSW 540', 'SSW 810', 'SSW 565'}], 
+        '11658': ['11658', 'Kelly, P', [], {'SYS 671', 'SYS 612', 'SYS 800'}, {'SSW 540', 'SSW 810', 'SSW 565'}], 
+        '11714': ['11714', 'Morton, A', ['SYS 611', 'SYS 645'], {'SYS 671', 'SYS 612', 'SYS 800'}, {'SSW 540', 'SSW 810', 'SSW 565'}], 
+        '11788': ['11788', 'Fuller, E', ['SSW 540'], {'SYS 671', 'SYS 612', 'SYS 800'}, None]}
+
+        Expect_Instructor_Summary = {('98764', 'Feynman, R', 'SFEN', 'CS 545', 1), 
+        ('98760', 'Darwin, C', 'SYEN', 'SYS 645', 1), 
+        ('98764', 'Feynman, R', 'SFEN', 'CS 501', 1), 
+        ('98760', 'Darwin, C', 'SYEN', 'SYS 800', 1), 
+        ('98760', 'Darwin, C', 'SYEN', 'SYS 750', 1), 
+        ('98763', 'Newton, I', 'SFEN', 'SSW 689', 1), 
+        ('98760', 'Darwin, C', 'SYEN', 'SYS 611', 2), 
+        ('98764', 'Feynman, R', 'SFEN', 'SSW 687', 3), 
+        ('98765', 'Einstein, A', 'SFEN', 'SSW 567', 4), 
+        ('98765', 'Einstein, A', 'SFEN', 'SSW 540', 3), 
+        ('98763', 'Newton, I', 'SFEN', 'SSW 555', 1), 
+        ('98764', 'Feynman, R', 'SFEN', 'SSW 564', 3)}
+
+        self.assertEqual(Repo.Major_Summary(),  Expect_Major_Summary)
+        self.assertEqual(Repo.Student_Summary(),  Expect_Student_Summary)
+        self.assertEqual(Repo.Instructor_Summary(),  Expect_Instructor_Summary)
+
+
+
+
 if __name__ == "__main__":
     while True:
+        unittest.main(exit=False, verbosity=2)
         path = input('Please input a folder path:\n')
         main(path)   # interact with the user
         
