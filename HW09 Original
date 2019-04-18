@@ -1,6 +1,6 @@
 '''
-Filename: HW10-Chengyao Zheng.py
-Created Date: Tuesday, April 2nd 2019, 11:06:38 am
+Filename: HW11-ChengyaoZheng.py
+Created Date: Tuesday, April 16th 2019, 11:06:38 am
 Author: Chengyao Zheng
 
 Copyright (c) 2019 Chengyao Zheng
@@ -10,6 +10,7 @@ from collections import defaultdict
 from prettytable import PrettyTable
 import unittest
 import os
+import sqlite3
 
 class Repository:
     # stores and process students, instructors and major informations
@@ -108,11 +109,16 @@ class Repository:
         # set for testing purpose due to possible repeated keys.
         table = PrettyTable(field_names=['CWID','Name','Dept','Course','Students'])
         table.title = 'Instructor Summary'
+        conn = sqlite3.connect("HW11czheng11DB.db")
+        c = conn.cursor()
 
-        for ins in self.ins.values():
-            for CWID, Name, Dept, course, students in ins.pt():
-                table.add_row([CWID, Name, Dept, course, students])
-                test.add((CWID, Name, Dept, course, students))
+        #for ins in self.ins.values():
+            #for CWID, Name, Dept, course, students in ins.pt():
+                #table.add_row([CWID, Name, Dept, course, students])
+                #test.add((CWID, Name, Dept, course, students))
+        for row1 in c.execute("select CWID, Name, Dept, g.Course, count(g.Student_CWID) as Students from instructors left join grades g on g.Instructor_CWID = CWID group by CWID, Name, Dept, g.Course order by Students DESC"):
+            table.add_row(row1)
+            test.add(row1)
 
         print(table)
         return test
@@ -186,10 +192,13 @@ def main(path):
         repo.Instructor_Summary()
         
     except FileNotFoundError as e:
-        print(e)
+        print(e, "\n")
 
     except ValueError as f:
-        print(f)
+        print(f, "\n")
+
+    except OSError as g:
+        print(g, "\n")
 
 
 class TestRepository(unittest.TestCase):
@@ -209,9 +218,7 @@ class TestRepository(unittest.TestCase):
         '11714': ['11714', 'Morton, A', ['SYS 611', 'SYS 645'], {'SYS 671', 'SYS 612', 'SYS 800'}, {'SSW 540', 'SSW 810', 'SSW 565'}], 
         '11788': ['11788', 'Fuller, E', ['SSW 540'], {'SYS 671', 'SYS 612', 'SYS 800'}, None]}
 
-        Expect_Instructor_Summary = {('98764', 'Feynman, R', 'SFEN', 'CS 545', 1), 
-        ('98760', 'Darwin, C', 'SYEN', 'SYS 645', 1), 
-        ('98764', 'Feynman, R', 'SFEN', 'CS 501', 1), 
+        Expect_Instructor_Summary = {('98760', 'Darwin, C', 'SYEN', 'SYS 645', 1), 
         ('98760', 'Darwin, C', 'SYEN', 'SYS 800', 1), 
         ('98760', 'Darwin, C', 'SYEN', 'SYS 750', 1), 
         ('98763', 'Newton, I', 'SFEN', 'SSW 689', 1), 
@@ -220,6 +227,8 @@ class TestRepository(unittest.TestCase):
         ('98765', 'Einstein, A', 'SFEN', 'SSW 567', 4), 
         ('98765', 'Einstein, A', 'SFEN', 'SSW 540', 3), 
         ('98763', 'Newton, I', 'SFEN', 'SSW 555', 1), 
+        ('98762', 'Hawking, S', 'SYEN', None, 0), 
+        ('98761', 'Edison, A', 'SYEN', None, 0), 
         ('98764', 'Feynman, R', 'SFEN', 'SSW 564', 3)}
 
         self.assertEqual(Repo.Major_Summary(),  Expect_Major_Summary)
@@ -230,16 +239,17 @@ class TestRepository(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    unittest.main(exit=False, verbosity=2)
+
     while True:
-        unittest.main(exit=False, verbosity=2)
         path = input('Please input a folder path:\n')
         main(path)   # interact with the user
         
         #Old story: continue or not?
-        option = input("Contine? input anything to continue, or enter Q to quit: ")
+        option = input("Contine? input anything to continue, or enter Q to quit: \n")
         
         if option == "Q" or option == "q":
-            print("Have a nice day! Good-Bye!")
+            print("\nHave a nice day! Good-Bye!\n")
             quit()
         
         else:
