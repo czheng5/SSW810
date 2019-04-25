@@ -90,7 +90,6 @@ class Repository:
         #print(table)
         return test
         
-    #@app.route("/student_sum")
     def Student_Summary(self):
         '''Student Summary'''
         test = dict()
@@ -102,11 +101,9 @@ class Repository:
             for CWID, Name, course, Required_remaining, Electives_remaining in stu.pt(self.major[stu.Dept]):
                 table.add_row([CWID, Name, course, Required_remaining, Electives_remaining])
                 test[CWID] = [CWID, Name, sorted(course), Required_remaining, Electives_remaining]
-        #form = [{key:value} for key, value in test.items()]
 
         #print(table)
-        #print(list(test.values([1])))
-        return test#, render_template('student_table.html', title = "Stevens Repository", table_title = "Student Summary", students = test)
+        return test
         
     def Instructor_Summary(self):
         '''Instructor Summary'''
